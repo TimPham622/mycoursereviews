@@ -15,9 +15,6 @@ services:
       - REDIS_URL=redis://mycoursereviews-cache:6379
     ports:
       - 3200:3200
-    depends_on:
-      - mycoursereviews-db
-      - mycoursereviews-cache
     networks:
       - csclub
     extra_hosts:
