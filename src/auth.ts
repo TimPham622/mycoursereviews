@@ -53,23 +53,27 @@ function extractRoles(account: any, profile: any): string[] {
     return Array.from(rolesSet);
 }
 
+const isLocalDockerDev =
+    Boolean(process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT && process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL) &&
+    process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT !== process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL;
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
     providers: [
         Keycloak({
             clientId: process.env.KEYCLOAK_CLIENT_ID!,
             clientSecret: process.env.KEYCLOAK_CLIENT_SECRET!,
-            issuer: process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL
+            issuer: isLocalDockerDev
                 ? `${process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL}/realms/cs-club`
-                : process.env.KEYCLOAK_ISSUER!,
-            ...(process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT
+                : (process.env.KEYCLOAK_ISSUER || 'https://auth.csclub.org.au/realms/cs-club'),
+            ...(isLocalDockerDev
                 ? {
+                      wellKnown: `${process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT}/realms/cs-club/.well-known/openid-configuration`,
                       jwks_endpoint: `${process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT}/realms/cs-club/protocol/openid-connect/certs`,
-                      wellKnown: undefined,
                       authorization: {
                           params: {
                               scope: 'openid email profile',
                           },
-                          url: `${process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL || 'https://auth.csclub.org.au'}/realms/cs-club/protocol/openid-connect/auth`,
+                          url: `${process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL}/realms/cs-club/protocol/openid-connect/auth`,
                       },
                       token: `${process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT}/realms/cs-club/protocol/openid-connect/token`,
                       userinfo: `${process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT}/realms/cs-club/protocol/openid-connect/userinfo`,
@@ -160,9 +164,5 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             session.user.role = role;
             return session;
         },
-    },
-    pages: {
-        signIn: '/auth/signin',
-        error: '/auth/error',
     },
 });
