@@ -26,10 +26,33 @@ declare module 'next-auth' {
     }
 }
 
-function extractRoles(account: any, profile: any): string[] {
+export function resolveKeycloakUrl(url?: string, issuer?: string) {
+    if (url) return url;
+    if (issuer) {
+        try {
+            return new URL(issuer).origin;
+        } catch {}
+    }
+    return 'https://auth.csclub.org.au';
+}
+
+export function resolveAuthRealm(realm?: string, issuer?: string) {
+    if (realm) return realm;
+    if (issuer) {
+        const parts = issuer.split('/realms/');
+        if (parts.length > 1) return parts[1].replace(/\/$/, '');
+    }
+    return 'cs-club';
+}
+
+export function resolveChecks(nodeEnv?: string, skipEnv?: string): ('state' | 'pkce')[] {
+    return nodeEnv === 'test' || skipEnv === 'true' ? [] : ['state'];
+}
+
+function extractRoles(account: any, profile?: any): string[] {
     const rolesSet = new Set<string>();
     
-    // 1. Try to decode access token if present
+    // 1. Extract from decoded access token if present
     if (account?.access_token) {
         try {
             const decoded = JSON.parse(Buffer.from(account.access_token.split('.')[1], 'base64').toString());
@@ -53,38 +76,33 @@ function extractRoles(account: any, profile: any): string[] {
     return Array.from(rolesSet);
 }
 
-const isLocalDockerDev =
-    Boolean(process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT && process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL) &&
-    process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT !== process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL;
+const containerKeycloakEndpoint = resolveKeycloakUrl(
+    process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT || process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL,
+    process.env.KEYCLOAK_ISSUER
+);
+const localKeycloakUrl = resolveKeycloakUrl(
+    process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL,
+    process.env.KEYCLOAK_ISSUER
+);
+const authRealm = resolveAuthRealm(process.env.NEXT_PUBLIC_AUTH_REALM, process.env.KEYCLOAK_ISSUER);
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
     providers: [
         Keycloak({
-            clientId: process.env.KEYCLOAK_CLIENT_ID!,
-            clientSecret: process.env.KEYCLOAK_CLIENT_SECRET!,
-            issuer: isLocalDockerDev
-                ? `${process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL}/realms/cs-club`
-                : (process.env.KEYCLOAK_ISSUER || 'https://auth.csclub.org.au/realms/cs-club'),
-            ...(isLocalDockerDev
-                ? {
-                      wellKnown: `${process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT}/realms/cs-club/.well-known/openid-configuration`,
-                      jwks_endpoint: `${process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT}/realms/cs-club/protocol/openid-connect/certs`,
-                      authorization: {
-                          params: {
-                              scope: 'openid email profile',
-                          },
-                          url: `${process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL}/realms/cs-club/protocol/openid-connect/auth`,
-                      },
-                      token: `${process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT}/realms/cs-club/protocol/openid-connect/token`,
-                      userinfo: `${process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT}/realms/cs-club/protocol/openid-connect/userinfo`,
-                  }
-                : {
-                      authorization: {
-                          params: {
-                              scope: 'openid email profile',
-                          },
-                      },
-                  }),
+            checks: resolveChecks(process.env.NODE_ENV, process.env.SKIP_ENV_VALIDATION),
+            clientId: process.env.KEYCLOAK_CLIENT_ID || process.env.AUTH_KEYCLOAK_ID!,
+            clientSecret: process.env.KEYCLOAK_CLIENT_SECRET || process.env.AUTH_KEYCLOAK_SECRET!,
+            issuer: `${localKeycloakUrl}/realms/${authRealm}`,
+            jwks_endpoint: `${containerKeycloakEndpoint}/realms/${authRealm}/protocol/openid-connect/certs`,
+            wellKnown: undefined,
+            authorization: {
+                params: {
+                    scope: 'openid email profile',
+                },
+                url: `${localKeycloakUrl}/realms/${authRealm}/protocol/openid-connect/auth`,
+            },
+            token: `${containerKeycloakEndpoint}/realms/${authRealm}/protocol/openid-connect/token`,
+            userinfo: `${containerKeycloakEndpoint}/realms/${authRealm}/protocol/openid-connect/userinfo`,
         }),
     ],
     trustHost: true,
@@ -96,7 +114,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             const roles = extractRoles(account, profile);
             const role = roles.includes('committee') ? 'admin' : 'user';
 
-            // Upsert Keycloak identity info into our local PostgreSQL database
+            // Upsert Keycloak identity info into local PostgreSQL database
             try {
                 await db.insert(users)
                     .values({
@@ -123,19 +141,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.sub = profile.sub ?? undefined;
                 token.roles = extractRoles(account, profile);
             } else if (token.accessToken && (!token.roles || !(token.roles as string[])?.includes('committee'))) {
-                // If token.roles is missing or doesn't have committee, dynamically extract from access token for active sessions
-                try {
-                    const decoded = JSON.parse(Buffer.from((token.accessToken as string).split('.')[1], 'base64').toString());
-                    const realmAccessRoles = decoded?.realm_access?.roles || [];
-                    const tokenRoles = decoded?.roles || [];
-                    token.roles = Array.from(new Set([
-                        ...((token.roles as string[]) || []),
-                        ...realmAccessRoles, 
-                        ...tokenRoles
-                    ]));
-                } catch (e) {
-                    console.error('Error decoding access token in subsequent jwt callback:', e);
-                }
+                token.roles = Array.from(new Set([
+                    ...((token.roles as string[]) || []),
+                    ...extractRoles({ access_token: token.accessToken }),
+                ]));
             }
             return token;
         },
@@ -149,7 +158,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             // Map committee members to admin role for moderation page access
             let role: 'admin' | 'user' = (token.roles as string[])?.includes('committee') ? 'admin' : 'user';
             
-            // Database role fallback check to ensure 100% correct roles synchronization
+            // Database role fallback check to ensure correct roles synchronization
             if (role === 'user' && token.sub) {
                 try {
                     const dbUsers = await db.select().from(users).where(eq(users.id, token.sub as string)).limit(1);
