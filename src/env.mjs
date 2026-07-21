@@ -5,6 +5,7 @@ export const env = createEnv({
     server: {
         NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
         AUTH_SECRET: z.string().min(1),
+        NEXTAUTH_URL: z.url().default('https://mycoursereviews.csclub.org.au'),
         KEYCLOAK_CLIENT_ID: z.string().min(1),
         KEYCLOAK_CLIENT_SECRET: z.string().min(1),
         KEYCLOAK_ISSUER: z.url(),
@@ -19,6 +20,7 @@ export const env = createEnv({
         NEXT_PUBLIC_FEEDBACK_FORM_URL: z.string().min(1).optional(),
     },
     experimental__runtimeEnv: {
+        NEXTAUTH_URL: process.env.NEXTAUTH_URL,
         NEXT_PUBLIC_UMAMI_WEBSITE_ID: process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID,
         NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT: process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT,
         NEXT_PUBLIC_LOCAL_KEYCLOAK_URL: process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL,
