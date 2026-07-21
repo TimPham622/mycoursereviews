@@ -5,6 +5,14 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { users } from '@/db/schema';
 
+if (!process.env.AUTH_URL && !process.env.NEXTAUTH_URL) {
+    const defaultUrl = process.env.NODE_ENV === 'production'
+        ? 'https://mycoursereviews.csclub.org.au'
+        : 'http://localhost:3200';
+    process.env.AUTH_URL = defaultUrl;
+    process.env.NEXTAUTH_URL = defaultUrl;
+}
+
 declare module 'next-auth' {
     interface Session {
         accessToken?: string;
@@ -53,7 +61,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             issuer: process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL
                 ? `${process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL}/realms/cs-club`
                 : process.env.KEYCLOAK_ISSUER!,
-            ...(process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT && process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL
+            ...(process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT
                 ? {
                       jwks_endpoint: `${process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT}/realms/cs-club/protocol/openid-connect/certs`,
                       wellKnown: undefined,
@@ -61,7 +69,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                           params: {
                               scope: 'openid email profile',
                           },
-                          url: `${process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL}/realms/cs-club/protocol/openid-connect/auth`,
+                          url: `${process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL || 'https://auth.csclub.org.au'}/realms/cs-club/protocol/openid-connect/auth`,
                       },
                       token: `${process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT}/realms/cs-club/protocol/openid-connect/token`,
                       userinfo: `${process.env.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT}/realms/cs-club/protocol/openid-connect/userinfo`,
