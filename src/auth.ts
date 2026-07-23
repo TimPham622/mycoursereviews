@@ -108,7 +108,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     trustHost: true,
     callbacks: {
         async signIn({ user, account, profile }) {
-            if (!user.id || !user.email) return false;
+            const userId = user?.id || (profile as any)?.sub || account?.providerAccountId;
+            if (!userId) return false;
+
+            const userName = user?.name || (profile as any)?.name || (profile as any)?.preferred_username || 'Adelaide Student';
 
             // Resolve and map standard CS Club roles to local DB roles
             const roles = extractRoles(account, profile);
@@ -118,27 +121,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             try {
                 await db.insert(users)
                     .values({
-                        id: user.id,
-                        name: user.name || 'Adelaide Student',
+                        id: userId,
+                        name: userName,
                         role: role,
                     })
                     .onConflictDoUpdate({
                         target: users.id,
                         set: {
-                            name: user.name || 'Adelaide Student',
+                            name: userName,
                             role: role,
                         },
                     });
-                return true;
             } catch (error) {
                 console.error('Error syncing user on signIn:', error);
-                return false;
             }
+            return true;
         },
         async jwt({ token, account, profile }) {
-            if (account && profile) {
+            if (account) {
                 token.accessToken = account.access_token;
-                token.sub = profile.sub ?? undefined;
+                token.sub = profile?.sub ?? (token.sub || account.providerAccountId);
                 token.roles = extractRoles(account, profile);
             } else if (token.accessToken && (!token.roles || !(token.roles as string[])?.includes('committee'))) {
                 token.roles = Array.from(new Set([
