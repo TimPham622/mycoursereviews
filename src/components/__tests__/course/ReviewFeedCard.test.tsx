@@ -4,8 +4,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import { Review } from '../../course/ReviewFeedCard';
 
-// Mock framer-motion before importing using modern Node 26 exports API
-mock.module('framer-motion', {
+// Mock motion/react before importing using modern Node 26 exports API
+mock.module('motion/react', {
     exports: {
         motion: {
             div: ({ children, ...props }: any) => React.createElement('div', props, children),

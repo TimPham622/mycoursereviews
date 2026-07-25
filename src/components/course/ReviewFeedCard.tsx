@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Card, CardBody, Textarea } from '@heroui/react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { useState, useTransition } from 'react';
 import { clsx } from 'clsx';
 import {

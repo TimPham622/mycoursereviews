@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Card, CardBody } from '@heroui/react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import Link from 'next/link';
 import { FaEdit, FaExternalLinkAlt, FaTrashAlt } from 'react-icons/fa';
 import { MdStar } from 'react-icons/md';
