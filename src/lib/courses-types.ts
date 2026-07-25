@@ -23,6 +23,22 @@ export interface CourseData {
 // Robust fallback course mocks for developer ease & server safety
 export const FALLBACK_COURSES: CourseData[] = [
     {
+        code: 'ACCT1004',
+        name: 'OL Introductory Accounting',
+        description: 'An introductory course covering fundamental principles of financial accounting, double-entry bookkeeping, financial statements, and manager decision making.',
+        terms: ['UAO Teaching Period 1', 'UAO Teaching Period 5', 'UAO Teaching Period 3'],
+        officialLink: '#',
+        subjectName: 'Accounting',
+    },
+    {
+        code: 'ACCT1001',
+        name: 'Financial Accounting 1',
+        description: 'Covers core principles of financial reporting, transaction recording, asset and liability valuation, and preparation of basic financial statements.',
+        terms: ['Semester 1', 'Semester 2'],
+        officialLink: '#',
+        subjectName: 'Accounting',
+    },
+    {
         code: 'COMP SCI 1102',
         name: 'Object Oriented Programming',
         description: 'An introduction to programming in the object-oriented paradigm. Topics include classes, objects, inheritance, polymorphism, design patterns, and debugging structures.',
@@ -72,103 +88,5 @@ export function getSubjectAbbreviation(subjectName: string): string {
     
     if (subjectName.length <= 8) return subjectName.toUpperCase();
     return subjectName;
-}
-
-/**
- * Maps a course code prefix (abbreviation) back to the full subject name used by the Courses API.
- * e.g. "INFO" -> "Information Systems", "COMP SCI" -> "Computer Science"
- */
-export function getSubjectNameFromCodePrefix(codePrefix: string): string | null {
-    const prefix = codePrefix.trim().toUpperCase();
-    const mapping: Record<string, string> = {
-        'COMP SCI': 'Computer Science',
-        'MATHS': 'Mathematical Sciences',
-        'STATS': 'Statistics',
-        'ELEC ENG': 'Electric/Electronic Eng & Tech',
-        'INFOSYS': 'Information Systems',
-        'INFO': 'Information Systems',
-        'AI': 'Artificial Intelligence',
-        'COMP GRAP': 'Computer Graphics',
-        'PROJ MGT': 'Project Management',
-        // Codes that are purely numeric prefixes not needing a space (e.g., ARTI)
-        'ARTI': 'Artificial Intelligence',
-    };
-    return mapping[prefix] ?? null;
-}
-
-/**
- * Maps course details from the Adelaide University Courses API to the app's CourseData schema.
- */
-export function buildCourseFromDetail(
-    detail: any,
-    fallbackId: string,
-    matchedTitle: string,
-    matchedSubject: string,
-    matchedCode: string
-): CourseData {
-    // Build normalized code: if the catalog code already contains letters use it as-is
-    let normalizedCode: string;
-    if (/[A-Za-z]/.test(matchedCode) && /\d/.test(matchedCode)) {
-        normalizedCode = matchedCode;
-    } else {
-        normalizedCode = `${getSubjectAbbreviation(matchedSubject)} ${matchedCode}`.trim();
-    }
-
-    const description =
-        detail?.course_overview ||
-        detail?.description ||
-        detail?.outline ||
-        `Official Adelaide University outline for ${normalizedCode} (${matchedTitle}).`;
-
-    const rawTerms = Array.isArray(detail?.terms) ? detail.terms : [];
-    const termNames = rawTerms.length > 0
-        ? rawTerms.map((t: string) => t.replace(' School', ''))
-        : ['Semester 1', 'Semester 2'];
-
-    const officialLink =
-        detail?.course_outline_url ||
-        detail?.course_url ||
-        detail?.officialLink ||
-        detail?.link ||
-        `https://www.adelaide.edu.au/course-outlines/${fallbackId}`;
-
-    // Map assessments (title, weighting, hurdle)
-    const rawAssessments = Array.isArray(detail?.assessments) ? detail.assessments : [];
-    const assessments = rawAssessments.map((a: any) => ({
-        title: a.title ?? '',
-        weighting: a.weighting ?? '',
-        hurdle: a.hurdle ?? '',
-    }));
-
-    // Map learning outcomes (description, outcome_index -> outcomeIndex)
-    const rawOutcomes = Array.isArray(detail?.learning_outcomes) ? detail.learning_outcomes : [];
-    const learningOutcomes = rawOutcomes.map((o: any) => ({
-        description: o.description ?? '',
-        outcomeIndex: o.outcome_index ?? 0,
-    }));
-
-    // Extract requirements sub-fields
-    const reqs = detail?.requirements;
-
-    return {
-        code: normalizedCode,
-        name: matchedTitle,
-        description,
-        terms: termNames,
-        officialLink,
-        coordinator: detail?.course_coordinator ?? null,
-        campus: detail?.campus ?? null,
-        units: detail?.units ?? null,
-        levelOfStudy: detail?.level_of_study ?? null,
-        prerequisites: reqs?.prerequisites ?? null,
-        corequisites: reqs?.corequisites ?? null,
-        antirequisites: reqs?.antirequisites ?? null,
-        assessments: assessments.length > 0 ? assessments : undefined,
-        learningOutcomes: learningOutcomes.length > 0 ? learningOutcomes : undefined,
-        textbooks: detail?.textbooks ?? null,
-        subjectName: detail?.name?.subject || matchedSubject || null,
-        apiId: fallbackId,
-        universityWideElective: detail?.university_wide_elective ?? null,
-    };
 }
 

@@ -5,13 +5,12 @@ export const env = createEnv({
     server: {
         NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
         AUTH_SECRET: z.string().min(1),
-        NEXTAUTH_URL: z.url().default('https://mycoursereviews.csclub.org.au'),
+        NEXTAUTH_URL: z.string().optional(),
         KEYCLOAK_CLIENT_ID: z.string().min(1),
         KEYCLOAK_CLIENT_SECRET: z.string().min(1),
-        KEYCLOAK_ISSUER: z.url(),
+        KEYCLOAK_ISSUER: z.string().min(1),
         DATABASE_URL: z.string().min(1),
-        REDIS_URL: z.url().default('redis://localhost:6379'),
-        COURSES_API_URL: z.url().default('https://courses-api.csclub.org.au'),
+        COURSES_DB_PATH: z.string().optional(),
     },
     client: {
         NEXT_PUBLIC_UMAMI_WEBSITE_ID: z.string().min(1).optional(),
@@ -26,5 +25,5 @@ export const env = createEnv({
         NEXT_PUBLIC_LOCAL_KEYCLOAK_URL: process.env.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL,
         NEXT_PUBLIC_FEEDBACK_FORM_URL: process.env.NEXT_PUBLIC_FEEDBACK_FORM_URL,
     },
-    skipValidation: !!process.env.SKIP_ENV_VALIDATION,
+    skipValidation: !!process.env.SKIP_ENV_VALIDATION || process.env.npm_lifecycle_event === 'build',
 });
