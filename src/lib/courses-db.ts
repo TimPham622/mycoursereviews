@@ -23,8 +23,11 @@ export function getSqliteDbPath(): string | null {
 
     const candidates = [
         process.env.COURSES_DB_PATH,
+        '../courses-api/local.sqlite3',
+        '../courses-api/src/local.sqlite3',
         '/data/courses-api/local.sqlite3',
         '/data/courses-api/dev.sqlite3',
+        '/app/courses-api/local.sqlite3',
         '/app/courses-api/src/local.sqlite3',
         '/app/courses-api/src/dev.sqlite3',
     ].filter(Boolean) as string[];
