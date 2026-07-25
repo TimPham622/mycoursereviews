@@ -21,7 +21,7 @@ jobs:
     needs: lint
     name: Build
     runs-on: ubuntu-24.04-arm
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: Production
     permissions:
       id-token: write
       contents: read
@@ -49,7 +49,10 @@ jobs:
 
       - name: Echo environment variables to .env.local
         run: |
+          echo "NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT=${{ secrets.NEXT_PUBLIC_CONTAINER_KEYCLOAK_ENDPOINT }}" >> .env.local
+          echo "NEXT_PUBLIC_LOCAL_KEYCLOAK_URL=${{ secrets.NEXT_PUBLIC_LOCAL_KEYCLOAK_URL }}" >> .env.local
           echo "NEXT_PUBLIC_UMAMI_WEBSITE_ID=${{ secrets.NEXT_PUBLIC_UMAMI_WEBSITE_ID }}" >> .env.local
+          echo "NEXT_PUBLIC_FEEDBACK_FORM_URL=${{ secrets.NEXT_PUBLIC_FEEDBACK_FORM_URL }}" >> .env.local
 
       - name: Build Docker container
         env:
@@ -76,9 +79,9 @@ jobs:
     needs: build
     name: Deploy
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: read
+    environment: Production
     steps:
       - name: Deploy on EC2
         env:
